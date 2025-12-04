@@ -9,7 +9,7 @@
 
 #![deny(missing_docs)]
 #![deny(warnings)]
-#![no_std]
+#![no_std]//因为 Rust std标准库自己就需要操作系统内核的支持
 #![no_main]
 #![feature(panic_info_message)]
 
