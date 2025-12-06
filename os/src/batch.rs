@@ -51,7 +51,7 @@ impl UserStack {
 struct AppManager {
     num_app: usize,
     current_app: usize,
-    app_start: [usize; MAX_APP_NUM + 1],
+    app_start: [usize; MAX_APP_NUM + 1],//参考下面的打印, 最后一个app也有一个结束地址,所以多留1
 } 
 
 impl AppManager {

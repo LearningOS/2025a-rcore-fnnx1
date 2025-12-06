@@ -30,18 +30,19 @@ pub struct RISCV64 {
 
 /// Encode the exit code using EXIT_FAILURE_FLAG.
 const fn exit_code_encode(code: u32) -> u32 {
-    (code << 16) | EXIT_FAILURE_FLAG
+    (code << 16) | EXIT_FAILURE_FLAG//按位或在这里等效于加(拼接), 取code的低16位拼接
 }
 
 impl RISCV64 {
     /// Create an instance.
-    pub const fn new(addr: u64) -> Self {
+    pub const fn new(addr: u64) -> Self {//pub可外部调用,const作用似乎还有争议
         RISCV64 { addr }
     }
 }
+//let xxx = RISCV64::new(addr);
 
 impl QEMUExit for RISCV64 {
-    /// Exit qemu with specified exit code.
+    /// Exit qemu with specified exit code.其实就是把错误码按规则解码后写进addr
     fn exit(&self, code: u32) -> ! {
         // If code is not a special value, we need to encode it with EXIT_FAILURE_FLAG.
         let code_new = match code {
@@ -52,7 +53,7 @@ impl QEMUExit for RISCV64 {
         unsafe {
             asm!(
                 "sw {0}, 0({1})",
-                in(reg)code_new, in(reg)self.addr
+                in(reg)code_new, in(reg)self.addr//把解码后退出码写进指定位置
             );
 
             // For the case that the QEMU exit attempt did not work, transition into an infinite
@@ -60,12 +61,12 @@ impl QEMUExit for RISCV64 {
             // this function here is the last expression in the `panic!()` handler
             // itself. This prevents a possible infinite loop.
             loop {
-                asm!("wfi", options(nomem, nostack));
+                asm!("wfi", options(nomem, nostack));//wfi - wait for interrupt
             }
         }
     }
 
-    fn exit_success(&self) -> ! {
+    fn exit_success(&self) -> ! {//欲表示退出成功直接调用?
         self.exit(EXIT_SUCCESS);
     }
 
@@ -74,6 +75,7 @@ impl QEMUExit for RISCV64 {
     }
 }
 
-const VIRT_TEST: u64 = 0x100000;
+const VIRT_TEST: u64 = 0x100000;//VT[20] = 1
 
+//QEH在0X100000的地方写退出码
 pub const QEMU_EXIT_HANDLE: RISCV64 = RISCV64::new(VIRT_TEST);
