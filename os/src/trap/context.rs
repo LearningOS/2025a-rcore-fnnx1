@@ -15,9 +15,9 @@ pub struct TrapContext {
 impl TrapContext {
     /// set stack pointer to x_2 reg (sp)
     pub fn set_sp(&mut self, sp: usize) {
-        self.x[2] = sp;//按内存排布来说刚好对应x2
+        self.x[2] = sp;//按内存排布来说刚好对应x2, 也就是被Trap.S约束(不按那个规范来就不能复用_restore了)的用于存放用户栈栈顶的位置
     }
-    /// init app context
+    /// init app context //这样之后就可以复用_restore来启动一个app了
     pub fn app_init_context(entry: usize, sp: usize) -> Self {
         let mut sstatus = sstatus::read(); // CSR sstatus
         sstatus.set_spp(SPP::User); //previous privilege mode: user mode
