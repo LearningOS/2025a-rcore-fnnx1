@@ -29,11 +29,12 @@ static USER_STACK: UserStack = UserStack {
 };
 
 impl KernelStack {
+    //栈的最高地址,但是是栈底?
     fn get_sp(&self) -> usize {
         self.data.as_ptr() as usize + KERNEL_STACK_SIZE
     }
     pub fn push_context(&self, cx: TrapContext) -> &'static mut TrapContext {
-        let cx_ptr 
+        let cx_ptr //这样写栈的最高地址处应该是0,而cx_ptr指向的位置应该是有数据的
             = (self.get_sp() - core::mem::size_of::<TrapContext>()) as *mut TrapContext;
         unsafe {
             *cx_ptr = cx;
@@ -55,7 +56,7 @@ struct AppManager {
 } 
 
 impl AppManager {
-    pub fn print_app_info(&self) {
+    pub fn print_app_info(&self) {//序号和起始地址
         println!("[kernel] num_app = {}", self.num_app);
         for i in 0..self.num_app {
             println!(
@@ -66,7 +67,7 @@ impl AppManager {
             );
         }
     }
-
+    
     unsafe fn load_app(&self, app_id: usize) {
         if app_id >= self.num_app {
             println!("All applications completed!");
@@ -101,22 +102,25 @@ impl AppManager {
     }
 }
 
+
+//声明为全局静态变量, lazy...和UPSC保证多线程安全, 具体原理还不懂
 lazy_static! {
     static ref APP_MANAGER: UPSafeCell<AppManager> = unsafe {
         UPSafeCell::new({
             extern "C" {
-                fn _num_app();
+                fn _num_app();//in link_app.S
             }
             let num_app_ptr = _num_app as usize as *const usize;
-            let num_app = num_app_ptr.read_volatile();
+            let num_app = num_app_ptr.read_volatile();//读指针指向的值,参考link_app.S
             let mut app_start: [usize; MAX_APP_NUM + 1] = [0; MAX_APP_NUM + 1];
             let app_start_raw: &[usize] =
-                core::slice::from_raw_parts(num_app_ptr.add(1), num_app + 1);
-            app_start[..=num_app].copy_from_slice(app_start_raw);
+                core::slice::from_raw_parts(num_app_ptr.add(1), num_app + 1);//在linkapp.s中num_pp符号指向一个数组,
+                //里面除了数量还有起始地址
+            app_start[..=num_app].copy_from_slice(app_start_raw);//[0]对齐
             AppManager {
-                num_app,
-                current_app: 0,
-                app_start,
+                num_app,//数量
+                current_app: 0,//当前no,初始化为0
+                app_start,//共numapp+1项有值
             }
         })
     };

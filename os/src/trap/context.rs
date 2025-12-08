@@ -1,6 +1,6 @@
 use riscv::register::sstatus::{self, Sstatus, SPP};
 /// Trap Context
-#[repr(C)]
+#[repr(C)]//trap后内核把对应寄存器存进TC,压入内核栈
 pub struct TrapContext {
     /// general regs[0..31]
     pub x: [usize; 32],
