@@ -36,8 +36,8 @@ __alltraps:
     //把这两个csr里面的东西存进t0和t1寄存器
     csrr t0, sstatus
     csrr t1, sepc
-    //csrr t2, sscratch 我觉得可以移到这里
-    //问:不能直接把csr的数据存进内存吗? 答: riscv没有直接把控制状态寄存器数据写进内存的指令.
+    //csrr t2, sscratch 我觉得可以移到这里来达成绝妙的对称
+    //riscv没有直接把控制状态寄存器数据写进内存的指令.
     sd t0, 32*8(sp)
     sd t1, 33*8(sp)
 
@@ -46,26 +46,27 @@ __alltraps:
     sd t2, 2*8(sp)
 
     # set input argument of trap_handler(cx: &mut TrapContext)
-    mv a0, sp//sp是内核栈顶地址
+    mv a0, sp//sp是内核栈顶地址, 和下面的mv sp, a0是一组"对偶操作"
     call trap_handler
 
 //上面的逆操作,弹出栈来实现从s到u
 __restore:
     # case1: start running app by __restore
     # case2: back to U after handling trap
-    mv sp, a0//a0放栈指针
-    # now sp->kernel stack(after allocated), sscratch->user stack
-    //从内存中读出读控制状态寄存器的值
+    mv sp, a0//调用_restore时a0是内核栈顶指针, 这个地方是启动应用程序传参用的
+    # 现在sp指向内核栈 now sp->kernel stack(after allocated), sscratch->user stack
+
+    //从内存中读出CSR(控制状态寄存器)的值
     # restore sstatus/sepc
     ld t0, 32*8(sp)
     ld t1, 33*8(sp)
     ld t2, 2*8(sp)
-    //写进对应寄存器
+    //写进对应CSR
     csrw sstatus, t0
     csrw sepc, t1
     csrw sscratch, t2
     # restore general-purpuse registers except sp/tp
-    //读出别的值
+    //读出普通寄存器的值
     ld x1, 1*8(sp)
     ld x3, 3*8(sp)
     .set n, 5
