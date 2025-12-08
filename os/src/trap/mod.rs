@@ -36,7 +36,7 @@ pub fn init() {
 }
 
 #[no_mangle]
-/// handle an interrupt, exception, or system call from user space
+/// handle an interrupt, exception, or system call from user space //将trap前寄存器状态存入内核栈后 被调用
 pub fn trap_handler(cx: &mut TrapContext/*传入参数在底层为TC的地址*/) -> &mut TrapContext {
     let scause = scause::read(); // get trap cause
     let stval = stval::read(); // get extra value

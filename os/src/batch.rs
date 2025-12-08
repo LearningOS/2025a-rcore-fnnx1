@@ -140,23 +140,26 @@ pub fn print_app_info() {
 pub fn run_next_app() -> ! {
     let mut app_manager = APP_MANAGER.exclusive_access();
     let current_app 
-        = app_manager.get_current_app();
-
+        = app_manager.get_current_app();//app序号
     unsafe {
         app_manager.load_app(current_app);
     }
     app_manager.move_to_next_app();
     drop(app_manager);
+    //以上操作是调整app_manager的状态
+
     // before this we have to drop local variables related to resources manually
     // and release the resources
     extern "C" {
         fn __restore(cx_addr: usize);
     }
+    //启动app本质上和trap的恢复是相同的过程, 于是这里复用_restore
+
     unsafe {
         __restore(KERNEL_STACK.push_context(TrapContext::app_init_context(
             APP_BASE_ADDRESS,
             USER_STACK.get_sp(),
-        )) as *const _ as usize);
+        )) as *const _ as usize/*为了模拟"trap到s模式后的状态", 按Trap.S的约定把app开始运行时需要的寄存器值(主要是用户栈栈顶地址)写进内核栈顶, 调用_restore之后把这些东西读进寄存器, 程序就自然地启动了:)*/);
     }
     panic!("Unreachable in batch::run_current_app!");
 }
