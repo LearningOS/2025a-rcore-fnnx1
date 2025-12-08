@@ -9,6 +9,8 @@
     .globl __alltraps
     .globl __restore
     .align 2//2^2 = 4字节(32位)对齐
+
+//注意:观察发现,只要栈不是空着的, 每一次栈操作结束后内核栈顶指针指向的内容都是有值的, 而非我早期以为的sp指向栈的下(低地址)一个空位. 栈为空时KS的栈顶指针指向栈的开端(最高地址), 似乎一直留空.
 __alltraps:
     //笔记
     //交换相应寄存器对于 内核栈/用户栈 栈顶 的指向
@@ -17,7 +19,7 @@ __alltraps:
     # allocate a TrapContext on kernel stack
     addi sp, sp, -34*8//把sp下移一个context的长度
     # save general-purpose registers
-    //注意到sp指向地址本身没有存放数据,是留空的,上部刚好剩余34*8bytes空间
+    //注意到sp指向地址对应x0,恒为0.上部刚好剩余33*8bytes空间
     //sd是把寄存器写进内存地址
     sd x1, 1*8(sp)
     # skip sp(x2), we will save it later 为啥?

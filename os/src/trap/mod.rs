@@ -37,7 +37,7 @@ pub fn init() {
 
 #[no_mangle]
 /// handle an interrupt, exception, or system call from user space
-pub fn trap_handler(cx: &mut TrapContext) -> &mut TrapContext {
+pub fn trap_handler(cx: &mut TrapContext/*传入参数在底层为TC的地址*/) -> &mut TrapContext {
     let scause = scause::read(); // get trap cause
     let stval = stval::read(); // get extra value
     match scause.cause() {
