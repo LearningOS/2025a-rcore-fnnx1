@@ -13,7 +13,7 @@ pub struct TrapContext {
 impl TrapContext {
     /// set stack pointer to x_2 reg (sp)
     pub fn set_sp(&mut self, sp: usize) {
-        self.x[2] = sp;
+        self.x[2] = sp;//在Trap.S中把sp的值(内核栈顶地址)写进了t2
     }
     /// init app context
     pub fn app_init_context(entry: usize, sp: usize) -> Self {
