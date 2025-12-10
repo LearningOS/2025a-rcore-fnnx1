@@ -27,6 +27,7 @@ use riscv::register::{
 global_asm!(include_str!("trap.S"));
 
 /// Initialize trap handling
+// 时间片轮转用到，设置stvec寄存器指向中断处理函数, 触发时钟中断时硬件会自动跳转到该地址
 pub fn init() {
     extern "C" {
         fn __alltraps();

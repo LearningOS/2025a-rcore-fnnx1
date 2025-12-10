@@ -3,6 +3,7 @@
 #[derive(Copy, Clone)]
 #[repr(C)]
 /// task context structure containing some registers
+// 只保存了被调用者保存寄存器，原因暂不明
 pub struct TaskContext {
     /// Ret position after task switching
     ra: usize,

@@ -7,6 +7,8 @@
 .endm
     .section .text
     .globl __switch
+    
+//保存当前应用上下文，加载下一个应用上下文
 __switch:
     # __switch(
     #     current_task_cx_ptr: *mut TaskContext,

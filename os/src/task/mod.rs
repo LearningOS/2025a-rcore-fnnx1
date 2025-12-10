@@ -132,7 +132,7 @@ impl TaskManager {
             }
             // go back to user mode
         } else {
-            panic!("All applications completed!");
+            panic!("All applications completed!");//找不到ready的应用
         }
     }
 }
