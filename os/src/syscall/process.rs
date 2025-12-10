@@ -1,8 +1,7 @@
 //! Process management syscalls
 use crate::{
-    task::{exit_current_and_run_next, suspend_current_and_run_next},
+    task::{TASK_MANAGER, exit_current_and_run_next, suspend_current_and_run_next},
     timer::get_time_us,
-    syscall::TRACER,
 };
 
 #[repr(C)]
@@ -40,7 +39,6 @@ pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
 }
 
 // TODO: implement the syscall
-// TODO has been done.
 pub fn sys_trace(trace_request: usize, id: usize, data: usize) -> isize {
     trace!("kernel: sys_trace");
     match trace_request{
@@ -53,7 +51,7 @@ pub fn sys_trace(trace_request: usize, id: usize, data: usize) -> isize {
                 addr.write(data as u8);
                 0
             },
-        2 => TRACER.query(id) as isize,
+        2 => TASK_MANAGER.query_record(id) as isize,
         _ => -1,
     }
 }

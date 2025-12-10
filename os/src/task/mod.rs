@@ -14,14 +14,59 @@ mod switch;
 #[allow(clippy::module_inception)]
 mod task;
 
+use core::mem::MaybeUninit;
+
 use crate::config::MAX_APP_NUM;
 use crate::loader::{get_num_app, init_app_cx};
 use crate::sync::UPSafeCell;
 use lazy_static::*;
+use alloc::vec::Vec;
 use switch::__switch;
 pub use task::{TaskControlBlock, TaskStatus};
 
 pub use context::TaskContext;
+
+struct History {
+    syscall_id: usize,
+    time: usize,
+}
+
+#[derive (Default)]
+/// syscall记录
+pub struct SyscallTracer {
+    history: Vec<History>,
+}
+
+
+impl SyscallTracer{
+    ///添加一个记录
+    pub fn add(&mut self, id: usize) -> (){
+        for his in self.history.iter_mut() {
+            if id == his.syscall_id {
+                his.time += 1;
+                return;
+            }
+        };
+        self.history.push(
+            History{
+                syscall_id: id,
+                time: 1
+            }
+        );
+        ()
+    }
+    ///查询历史记录
+    pub fn query(&self, id: usize) -> usize{
+        for his in self.history.iter() {
+            if id == his.syscall_id {
+                return his.time;
+            }
+        }
+        return 0;
+    }
+}
+
+
 
 /// The task manager, where all the tasks are managed.
 ///
@@ -43,6 +88,8 @@ pub struct TaskManager {
 pub struct TaskManagerInner {
     /// task list
     tasks: [TaskControlBlock; MAX_APP_NUM],
+    /// 系统调用记录
+    tracer: [SyscallTracer; MAX_APP_NUM],
     /// id of current `Running` task
     current_task: usize,
 }
@@ -55,15 +102,29 @@ lazy_static! {
             task_cx: TaskContext::zero_init(),
             task_status: TaskStatus::UnInit,
         }; MAX_APP_NUM];
+        // 使用MaybeUninit解决没有实现copy导致的报错
+        // https://cloud.tencent.com/developer/article/2345493
+        let mut tracer: [
+            MaybeUninit<SyscallTracer>;
+            MAX_APP_NUM
+        ] = unsafe { MaybeUninit::uninit().assume_init() };
+
         for (i, task) in tasks.iter_mut().enumerate() {
             task.task_cx = TaskContext::goto_restore(init_app_cx(i));
             task.task_status = TaskStatus::Ready;
         }
+        for i in 0..MAX_APP_NUM {
+            tracer[i] = MaybeUninit::new(SyscallTracer::default());
+        }
+        let tracer = unsafe { 
+            core::mem::transmute::<_, [SyscallTracer; MAX_APP_NUM]>(tracer) 
+        };
         TaskManager {
             num_app,
             inner: unsafe {
                 UPSafeCell::new(TaskManagerInner {
                     tasks,
+                    tracer,
                     current_task: 0,
                 })
             },
@@ -135,6 +196,22 @@ impl TaskManager {
             panic!("All applications completed!");//找不到ready的应用
         }
     }
+
+    /// 添加系统调用记录
+    pub fn add_record(&self, id: usize) -> (){
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        inner.tracer[current].add(id);
+        ()
+    }
+    
+    /// 查询
+    pub fn query_record(&self, id: usize) -> usize{
+        let inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        inner.tracer[current].query(id)
+    }
+
 }
 
 /// Run the first task in task list.
