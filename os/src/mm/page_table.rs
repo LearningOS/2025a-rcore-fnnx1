@@ -5,6 +5,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 use bitflags::*;
 
+// 一位一标志
 bitflags! {
     /// page table entry flags
     pub struct PTEFlags: u8 {
@@ -29,7 +30,7 @@ bitflags! {
 
 #[derive(Copy, Clone)]
 #[repr(C)]
-/// page table entry structure
+/// page table entry structure PTE
 pub struct PageTableEntry {
     /// bits of page table entry
     pub bits: usize,
@@ -46,9 +47,9 @@ impl PageTableEntry {
     pub fn empty() -> Self {
         PageTableEntry { bits: 0 }
     }
-    /// Get the physical page number from the page table entry
+    /// Get the physical page number from the page table entry 取出下一级页表的物理页号
     pub fn ppn(&self) -> PhysPageNum {
-        (self.bits >> 10 & ((1usize << 44) - 1)).into()
+        (self.bits >> 10 & ((1usize << 44) - 1)/*这样相当于[43：0]为1*/).into()
     }
     /// Get the flags from the page table entry
     pub fn flags(&self) -> PTEFlags {
@@ -72,10 +73,10 @@ impl PageTableEntry {
     }
 }
 
-/// page table structure
+/// page table structure 页表
 pub struct PageTable {
-    root_ppn: PhysPageNum,
-    frames: Vec<FrameTracker>,
+    root_ppn: PhysPageNum,//自身的物理页号
+    frames: Vec<FrameTracker>,//该页表内的所有页
 }
 
 /// Assume that it won't oom when creating/mapping.
