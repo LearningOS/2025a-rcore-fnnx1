@@ -161,8 +161,8 @@ impl VirtPageNum {
         let mut vpn = self.0;
         let mut idx = [0usize; 3];
         for i in (0..3).rev() {
-            idx[i] = vpn & 511;
-            vpn >>= 9;
+            idx[i] = vpn & 511;//9'b111111111,取低9位
+            vpn >>= 9;//一个虚拟页号包含三级页表的索引号，每个索引号9位
         }
         idx
     }
@@ -177,6 +177,7 @@ impl PhysAddr {
 }
 impl PhysPageNum {
     /// Get the reference of page table(array of ptes)
+    /// 隐含：当前物理页是作为页表使用的
     pub fn get_pte_array(&self) -> &'static mut [PageTableEntry] {
         let pa: PhysAddr = (*self).into();
         unsafe { core::slice::from_raw_parts_mut(pa.0 as *mut PageTableEntry, 512) }

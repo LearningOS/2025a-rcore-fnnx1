@@ -35,7 +35,7 @@ lazy_static! {
 }
 /// address space
 pub struct MemorySet {
-    page_table: PageTable,
+    page_table: PageTable,//管理内存的‘页表‘结构体
     areas: Vec<MapArea>,
 }
 
@@ -265,7 +265,7 @@ impl MemorySet {
 }
 /// map area structure, controls a contiguous piece of virtual memory
 pub struct MapArea {
-    vpn_range: VPNRange,
+    vpn_range: VPNRange,//
     data_frames: BTreeMap<VirtPageNum, FrameTracker>,
     map_type: MapType,
     map_perm: MapPermission,
