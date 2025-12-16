@@ -92,28 +92,29 @@ impl From<VirtPageNum> for usize {
         v.0
     }
 }
-/// virtual address impl
+/// virtual address impl 布局:{25,9,9,9,12}
 impl VirtAddr {
-    /// Get the (floor) virtual page number
+    /// Get the (floor) virtual page number 向下取整获取页号
     pub fn floor(&self) -> VirtPageNum {
         VirtPageNum(self.0 / PAGE_SIZE)
     }
 
-    /// Get the (ceil) virtual page number
+    /// Get the (ceil) virtual page number 向上取整获取页号
     pub fn ceil(&self) -> VirtPageNum {
         VirtPageNum((self.0 - 1 + PAGE_SIZE) / PAGE_SIZE)
     }
 
-    /// Get the page offset of virtual address
+    /// Get the page offset of virtual address 获得页内偏移(页表内序号)
     pub fn page_offset(&self) -> usize {
-        self.0 & (PAGE_SIZE - 1)
+        self.0 & (PAGE_SIZE - 1)//4K - 1 = b1111_1111_1111
     }
 
-    /// Check if the virtual address is aligned by page size
+    /// Check if the virtual address is aligned by page size 是否对齐
     pub fn aligned(&self) -> bool {
         self.page_offset() == 0
     }
 }
+/// 虚拟内存和虚拟页号转换
 impl From<VirtAddr> for VirtPageNum {
     fn from(v: VirtAddr) -> Self {
         assert_eq!(v.page_offset(), 0);
@@ -125,7 +126,7 @@ impl From<VirtPageNum> for VirtAddr {
         Self(v.0 << PAGE_SIZE_BITS)
     }
 }
-impl PhysAddr {
+impl PhysAddr {//和虚拟内存的几个方法基本上一模一样
     /// Get the (floor) physical page number
     pub fn floor(&self) -> PhysPageNum {
         PhysPageNum(self.0 / PAGE_SIZE)
