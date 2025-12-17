@@ -35,7 +35,7 @@ lazy_static! {
 }
 /// address space
 pub struct MemorySet {
-    page_table: PageTable,//管理内存的‘页表‘结构体
+    page_table: PageTable,//页表结构体
     areas: Vec<MapArea>,
 }
 
@@ -264,10 +264,11 @@ impl MemorySet {
     }
 }
 /// map area structure, controls a contiguous piece of virtual memory
+/// 映射区域，vpn_range内的 虚拟页号->物理页号（含权限信息）
 pub struct MapArea {
-    vpn_range: VPNRange,//
-    data_frames: BTreeMap<VirtPageNum, FrameTracker>,
-    map_type: MapType,
+    vpn_range: VPNRange,//虚拟页号范围，区间形式
+    data_frames: BTreeMap<VirtPageNum, FrameTracker>,//用BTree存储虚拟页号到物理页帧的映射（当且仅当非同等映射
+    map_type: MapType,//枚举，同等映射或非同等映射
     map_perm: MapPermission,
 }
 
@@ -287,21 +288,24 @@ impl MapArea {
             map_perm,
         }
     }
+    //新增映射某个虚拟页号
+    //为何不需要检查vpn是否在vpn_range内？--似乎是因为仅在map()中调用
     pub fn map_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) {
         let ppn: PhysPageNum;
         match self.map_type {
             MapType::Identical => {
-                ppn = PhysPageNum(vpn.0);
+                ppn = PhysPageNum(vpn.0);//同等映射，物理页号 = 虚拟页号
             }
             MapType::Framed => {
-                let frame = frame_alloc().unwrap();
+                let frame = frame_alloc().unwrap();//按正常分配顺序分配一个物理页帧
                 ppn = frame.ppn;
                 self.data_frames.insert(vpn, frame);
             }
         }
         let pte_flags = PTEFlags::from_bits(self.map_perm.bits).unwrap();
-        page_table.map(vpn, ppn, pte_flags);
+        page_table.map(vpn, ppn, pte_flags);//在页表中建立映射
     }
+    //取消映射某个虚拟页号
     #[allow(unused)]
     pub fn unmap_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) {
         if self.map_type == MapType::Framed {
@@ -309,6 +313,7 @@ impl MapArea {
         }
         page_table.unmap(vpn);
     }
+    //映射整个区域
     pub fn map(&mut self, page_table: &mut PageTable) {
         for vpn in self.vpn_range {
             self.map_one(page_table, vpn);
@@ -320,6 +325,7 @@ impl MapArea {
             self.unmap_one(page_table, vpn);
         }
     }
+    //缩小映射区域
     #[allow(unused)]
     pub fn shrink_to(&mut self, page_table: &mut PageTable, new_end: VirtPageNum) {
         for vpn in VPNRange::new(new_end, self.vpn_range.get_end()) {
@@ -327,6 +333,7 @@ impl MapArea {
         }
         self.vpn_range = VPNRange::new(self.vpn_range.get_start(), new_end);
     }
+    //扩大映射区域
     #[allow(unused)]
     pub fn append_to(&mut self, page_table: &mut PageTable, new_end: VirtPageNum) {
         for vpn in VPNRange::new(self.vpn_range.get_end(), new_end) {
@@ -336,24 +343,29 @@ impl MapArea {
     }
     /// data: start-aligned but maybe with shorter length
     /// assume that all frames were cleared before
+    /// 把data复制到maparea，首对齐，如果data不足够长，调用前需要清零frames
     pub fn copy_data(&mut self, page_table: &mut PageTable, data: &[u8]) {
         assert_eq!(self.map_type, MapType::Framed);
         let mut start: usize = 0;
         let mut current_vpn = self.vpn_range.get_start();
         let len = data.len();
         loop {
+            //一次取一页长度的data
             let src = &data[start..len.min(start + PAGE_SIZE)];
+            //从页表中取出对应物理页帧的可变切片
             let dst = &mut page_table
                 .translate(current_vpn)
                 .unwrap()
                 .ppn()
                 .get_bytes_array()[..src.len()];
+            //复制到物理页帧中
             dst.copy_from_slice(src);
+            //挪动
             start += PAGE_SIZE;
             if start >= len {
                 break;
             }
-            current_vpn.step();
+            current_vpn.step();//进入下一个虚拟页
         }
     }
 }
@@ -380,6 +392,7 @@ bitflags! {
 }
 
 /// Return (bottom, top) of a kernel stack in kernel space.
+/// ？
 pub fn kernel_stack_position(app_id: usize) -> (usize, usize) {
     let top = TRAMPOLINE - app_id * (KERNEL_STACK_SIZE + PAGE_SIZE);
     let bottom = top - KERNEL_STACK_SIZE;

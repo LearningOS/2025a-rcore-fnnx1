@@ -100,7 +100,7 @@ impl PageTable {
     }
     /// Find PageTableEntry by VirtPageNum, 
     /// create a frame for a 4KB page table if not exist
-    /// 查找虚拟页号对应的页表项（最终映射到的物理页号）
+    /// 查找虚拟页号对应的页表项（最终映射到的物理页号），不存在就新建一个
     fn find_pte_create(&mut self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
         let idxs = vpn.indexes();
         let mut ppn = self.root_ppn;
@@ -124,6 +124,7 @@ impl PageTable {
         result
     }
     /// Find PageTableEntry by VirtPageNum
+    /// 只查询，不创建
     fn find_pte(&self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
         let idxs = vpn.indexes();
         let mut ppn = self.root_ppn;
