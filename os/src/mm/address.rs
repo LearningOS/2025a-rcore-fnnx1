@@ -114,13 +114,14 @@ impl VirtAddr {
         self.page_offset() == 0
     }
 }
-/// 虚拟内存和虚拟页号转换
+//向下取整
 impl From<VirtAddr> for VirtPageNum {
     fn from(v: VirtAddr) -> Self {
         assert_eq!(v.page_offset(), 0);
         v.floor()
     }
 }
+//得到的是页起始地址
 impl From<VirtPageNum> for VirtAddr {
     fn from(v: VirtPageNum) -> Self {
         Self(v.0 << PAGE_SIZE_BITS)

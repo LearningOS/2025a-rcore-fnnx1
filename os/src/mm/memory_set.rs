@@ -44,7 +44,7 @@ impl MemorySet {
     pub fn new_bare() -> Self {
         Self {
             page_table: PageTable::new(),
-            areas: Vec::new(),
+            areas: Vec::new(),//理论上数据会被放在堆区，.ekernel之后
         }
     }
     /// Get the page table token
@@ -145,6 +145,7 @@ impl MemorySet {
     }
     /// Include sections in elf and trampoline and TrapContext and user stack,
     /// also returns user_sp_base and entry point.
+    /// 没有引用self，关联函数，创建一个新的MemorySet，起点和终点由程序自己决定
     pub fn from_elf(elf_data: &[u8]) -> (Self, usize, usize) {
         let mut memory_set = Self::new_bare();
         // map trampoline
@@ -156,6 +157,7 @@ impl MemorySet {
         assert_eq!(magic, [0x7f, 0x45, 0x4c, 0x46], "invalid elf!");
         let ph_count = elf_header.pt2.ph_count();
         let mut max_end_vpn = VirtPageNum(0);
+        //映射每个段
         for i in 0..ph_count {
             let ph = elf.program_header(i).unwrap();
             if ph.get_type().unwrap() == xmas_elf::program::Type::Load {
@@ -181,9 +183,11 @@ impl MemorySet {
             }
         }
         // map user stack with U flags
+        // 取的是页起始地址
         let max_end_va: VirtAddr = max_end_vpn.into();
+        // 用户栈底
         let mut user_stack_bottom: usize = max_end_va.into();
-        // guard page
+        // guard page 保证按页对齐且不出现交错（不过似乎可能留下最高4095B空隙）
         user_stack_bottom += PAGE_SIZE;
         let user_stack_top = user_stack_bottom + USER_STACK_SIZE;
         memory_set.push(
@@ -230,10 +234,12 @@ impl MemorySet {
         }
     }
     /// Translate a virtual page number to a page table entry
+    /// 虚拟页号到页表项，实际上也就是物理页号+权限信息
     pub fn translate(&self, vpn: VirtPageNum) -> Option<PageTableEntry> {
         self.page_table.translate(vpn)
     }
     /// shrink the area to new_end
+    /// 缩小某个指定起点的映射段，返回是否成功
     #[allow(unused)]
     pub fn shrink_to(&mut self, start: VirtAddr, new_end: VirtAddr) -> bool {
         if let Some(area) = self
@@ -249,6 +255,7 @@ impl MemorySet {
     }
 
     /// append the area to new_end
+    /// 扩大段，同上
     #[allow(unused)]
     pub fn append_to(&mut self, start: VirtAddr, new_end: VirtAddr) -> bool {
         if let Some(area) = self

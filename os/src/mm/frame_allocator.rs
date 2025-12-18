@@ -108,7 +108,7 @@ pub fn init_frame_allocator() {
         fn ekernel();//end of kernel, 内核结束地址
     }
     FRAME_ALLOCATOR.exclusive_access().init(
-        PhysAddr::from(ekernel as usize).ceil(),
+        PhysAddr::from(ekernel as usize).ceil(),//向上取整，返回下一页页号
         PhysAddr::from(MEMORY_END).floor(),
     );//从内核结束开始，内存末尾结束
 }
@@ -120,6 +120,7 @@ pub fn frame_alloc() -> Option<FrameTracker> {
         .alloc()
         .map(FrameTracker::new)
         //最后这行等价于.map(|x| FrameTracker::new(x))
+        //返回一个map里面new的Option<FrameTracker>
 }
 
 /// Deallocate a physical page frame with a given ppn
