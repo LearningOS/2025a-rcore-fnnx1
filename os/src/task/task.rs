@@ -91,6 +91,7 @@ impl TaskControlBlock {
     /// Create a new process
     ///
     /// At present, it is only used for the creation of initproc
+    /// 从二进制文件(程序)创建一个进程  
     pub fn new(elf_data: &[u8]) -> Self {
         // memory_set with elf program headers/trampoline/trap context/user stack
         let (memory_set, user_sp, entry_point) = MemorySet::from_elf(elf_data);
@@ -163,6 +164,7 @@ impl TaskControlBlock {
     }
 
     /// parent process fork the child process
+    /// fork出的子进程成为返回值
     pub fn fork(self: &Arc<Self>) -> Arc<Self> {
         // ---- access parent PCB exclusively
         let mut parent_inner = self.inner_exclusive_access();

@@ -7,6 +7,7 @@
 .endm
     .section .text
     .globl __switch
+//调用此函数时cpu处于内核态
 __switch:
     # __switch(
     #     current_task_cx_ptr: *mut TaskContext,
