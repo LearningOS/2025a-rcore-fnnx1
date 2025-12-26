@@ -98,8 +98,8 @@ pub fn init_frame_allocator() {
         fn ekernel();
     }
     FRAME_ALLOCATOR.exclusive_access().init(
-        PhysAddr::from(ekernel as usize).ceil(),
-        PhysAddr::from(MEMORY_END).floor(),
+        PhysAddr::from(ekernel as usize).ceil(),//上对齐
+        PhysAddr::from(MEMORY_END).floor(),//下对齐
     );
 }
 

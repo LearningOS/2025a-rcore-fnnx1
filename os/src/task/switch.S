@@ -9,6 +9,7 @@
     .globl __switch
 
 //把当前任务上下文保存，切换到下一个任务上下文
+//调用此函数时cpu处于内核态
 __switch:
     # __switch(
     #     current_task_cx_ptr: *mut TaskContext,

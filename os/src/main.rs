@@ -102,7 +102,7 @@ fn kernel_log_info() {
 pub fn rust_main() -> ! {
     clear_bss();
     kernel_log_info();
-    mm::init();
+    mm::init();//初始化内核空间
     mm::remap_test();
     task::add_initproc();//只是添加，并没有运行
     println!("after initproc!");

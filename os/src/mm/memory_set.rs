@@ -91,6 +91,7 @@ impl MemorySet {
         );
     }
     /// Without kernel stacks.
+    /// 内核空间是恒等映射的
     pub fn new_kernel() -> Self {
         let mut memory_set = Self::new_bare();
         // map trampoline
@@ -254,6 +255,7 @@ impl MemorySet {
         memory_set
     }
     /// Change page table by writing satp CSR Register.
+    /// 从这时开始, 才正式启用虚拟内存(内核空间也是虚拟内存)
     pub fn activate(&self) {
         let satp = self.page_table.token();
         unsafe {

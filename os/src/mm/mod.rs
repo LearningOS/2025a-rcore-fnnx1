@@ -21,6 +21,6 @@ use page_table::{PTEFlags, PageTable};
 /// initiate heap allocator, frame allocator and kernel space
 pub fn init() {
     heap_allocator::init_heap();
-    frame_allocator::init_frame_allocator();
-    KERNEL_SPACE.exclusive_access().activate();
+    frame_allocator::init_frame_allocator();//这个"初始化"除了设置了一个可用物理页帧范围实际上啥都没做
+    KERNEL_SPACE.exclusive_access().activate();//这里启用内核空间(虚拟地址)时应该会把8000_0000~8800_0000恒等映射进页表.
 }
