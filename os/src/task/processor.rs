@@ -13,6 +13,7 @@ use alloc::sync::Arc;
 use lazy_static::*;
 
 /// Processor management structure
+/// 只记录当前任务block与空闲状态下的任务上下文
 pub struct Processor {
     ///The task currently executing on the current processor
     current: Option<Arc<TaskControlBlock>>,
@@ -42,6 +43,7 @@ impl Processor {
 
     ///Get current task in cloning semanteme
     pub fn current(&self) -> Option<Arc<TaskControlBlock>> {
+        //map方法传入Option<T>，对T进行处理（闭包），并返回新的Option<T'>
         self.current.as_ref().map(Arc::clone)
     }
 }
@@ -53,12 +55,14 @@ lazy_static! {
 ///The main part of process execution and scheduling
 ///Loop `fetch_task` to get the process that needs to run, and switch the process through `__switch`
 pub fn run_tasks() {
+    //注意，这里是一个循环
     loop {
         let mut processor = PROCESSOR.exclusive_access();
         if let Some(task) = fetch_task() {
             let idle_task_cx_ptr = processor.get_idle_task_cx_ptr();
             // access coming task TCB exclusively
             let mut task_inner = task.inner_exclusive_access();
+            //这玩意保存在内核堆区
             let next_task_cx_ptr = &task_inner.task_cx as *const TaskContext;
             task_inner.task_status = TaskStatus::Running;
             // release coming task_inner manually
@@ -68,8 +72,12 @@ pub fn run_tasks() {
             // release processor manually
             drop(processor);
             unsafe {
+                // 调用前，a寄存器和t寄存器已经被保存好（调用者保存）
+                // __switch会保存s寄存器
                 __switch(idle_task_cx_ptr, next_task_cx_ptr);
-            }
+            } 
+            // 一段时间后后可能会返回到这里（切回空闲状态后）
+            // 进入下一个循环
         } else {
             warn!("no tasks available in run_tasks");
         }
@@ -101,6 +109,7 @@ pub fn current_trap_cx() -> &'static mut TrapContext {
 }
 
 ///Return to idle control flow for new scheduling
+///保存当前任务到传入参数地址（这时还是用户态），切换到空闲状态
 pub fn schedule(switched_task_cx_ptr: *mut TaskContext) {
     let mut processor = PROCESSOR.exclusive_access();
     let idle_task_cx_ptr = processor.get_idle_task_cx_ptr();

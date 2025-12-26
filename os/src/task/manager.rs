@@ -5,6 +5,7 @@ use alloc::collections::VecDeque;
 use alloc::sync::Arc;
 use lazy_static::*;
 ///A array of `TaskControlBlock` that is thread-safe
+/// 管理所有待处理任务（数据结构：队列）
 pub struct TaskManager {
     ready_queue: VecDeque<Arc<TaskControlBlock>>,
 }
