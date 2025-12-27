@@ -41,8 +41,10 @@ impl RecycleAllocator {
 }
 
 lazy_static! {
+    // PID分配器,从0开始分配,只起计数标识作用
     static ref PID_ALLOCATOR: UPSafeCell<RecycleAllocator> =
         unsafe { UPSafeCell::new(RecycleAllocator::new()) };
+    // 内核栈分配器,同样只起标识作用
     static ref KSTACK_ALLOCATOR: UPSafeCell<RecycleAllocator> =
         unsafe { UPSafeCell::new(RecycleAllocator::new()) };
 }
@@ -74,8 +76,9 @@ pub struct KernelStack(pub usize);
 
 /// allocate a new kernel stack
 pub fn kstack_alloc() -> KernelStack {
-    let kstack_id = KSTACK_ALLOCATOR.exclusive_access().alloc();
-    let (kstack_bottom, kstack_top) = kernel_stack_position(kstack_id);
+    let kstack_id = KSTACK_ALLOCATOR.exclusive_access().alloc();//分配一个内核栈号
+    let (kstack_bottom, kstack_top) = kernel_stack_position(kstack_id);//内核栈区间端点由id经线性函数直接映射得到,由id唯一确定
+    //在内核空间中插入内核栈映射区
     KERNEL_SPACE.exclusive_access().insert_framed_area(
         kstack_bottom.into(),
         kstack_top.into(),
@@ -84,7 +87,7 @@ pub fn kstack_alloc() -> KernelStack {
     KernelStack(kstack_id)
 }
 
-impl Drop for KernelStack {
+impl Drop for KernelStack {//自动回收内核栈空间
     fn drop(&mut self) {
         let (kernel_stack_bottom, _) = kernel_stack_position(self.0);
         let kernel_stack_bottom_va: VirtAddr = kernel_stack_bottom.into();

@@ -55,6 +55,9 @@ pub struct TaskControlBlockInner {
 
     /// Parent process of the current process.
     /// Weak will not affect the reference count of the parent
+    /// *因为 Weak 引用不计入所有权，因此它无法阻止所引用的内存值被释放掉，而且 Weak 本身不对值的存在性做任何担保，引用的值还存在就返回 Some，不存在就返回 None*
+    ///    --摘自https://course.rs/advance/circle-self-ref/circle-reference.html
+    /// 父进程似了也没事
     pub parent: Option<Weak<TaskControlBlock>>,
 
     /// A vector containing TCBs of all child processes of the current process
@@ -64,9 +67,11 @@ pub struct TaskControlBlockInner {
     pub exit_code: i32,
 
     /// Heap bottom
+    /// 堆区底部
     pub heap_bottom: usize,
 
     /// Program break
+    /// 堆区顶部
     pub program_brk: usize,
 }
 
@@ -95,8 +100,10 @@ impl TaskControlBlock {
     pub fn new(elf_data: &[u8]) -> Self {
         // memory_set with elf program headers/trampoline/trap context/user stack
         let (memory_set, user_sp, entry_point) = MemorySet::from_elf(elf_data);
+        // 上一行代码执行结束后, 应用地址空间内的地址已经分配了一个对应的物理页
         let trap_cx_ppn = memory_set
-            .translate(VirtAddr::from(TRAP_CONTEXT_BASE).into())
+            .translate(VirtAddr::from(TRAP_CONTEXT_BASE/*TRAMPOLINE - PAGE_SIZE, 跳板页的上一页起点*/).into())
+            //注意,translate的定义是: 如果没有则分配一个再返回分配的物理页号
             .unwrap()
             .ppn();
         // alloc a pid and a kernel stack in kernel space
