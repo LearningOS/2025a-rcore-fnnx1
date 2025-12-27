@@ -221,6 +221,7 @@ impl TaskControlBlock {
     }
 
     /// change the location of the program break. return None if failed.
+    /// 成功则返回旧中断地址
     pub fn change_program_brk(&self, size: i32) -> Option<usize> {
         let mut inner = self.inner_exclusive_access();
         let heap_bottom = inner.heap_bottom;

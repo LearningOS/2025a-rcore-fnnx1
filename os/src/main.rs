@@ -104,7 +104,7 @@ pub fn rust_main() -> ! {
     kernel_log_info();
     mm::init();//初始化内核空间
     mm::remap_test();
-    task::add_initproc();//添加一个初始化进程
+    task::add_initproc();//只是添加，并没有运行
     println!("after initproc!");
     trap::init();
     trap::enable_timer_interrupt();
