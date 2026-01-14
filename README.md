@@ -78,3 +78,6 @@ $ cd ci-user && make test CHAPTER=$ID
 ```
 
 Notice: $ID is from [3,4,5,6,8]
+
+
+tests: https://github.com/Azure-stars/testsuits-for-oskernel.git
