@@ -2,7 +2,7 @@
 
 use crate::{
     fs::{open_file, OpenFlags},
-    mm::{translated_ref, translated_refmut, translated_str},
+    mm::{translated_ref, translated_refmut, translated_str, mmap},
     task::{
         add_task, current_task, current_user_token, exit_current_and_run_next, pid2task,
         suspend_current_and_run_next, SignalAction, SignalFlags, MAX_SIG,
@@ -144,8 +144,14 @@ pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
 /// YOUR JOB: Implement mmap.
 pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
     trace!("kernel:pid[{}] sys_mmap NOT IMPLEMENTED", current_task().unwrap().pid.0);
-    
-    -1
+    mmap::do_mmap(
+        _start, 
+        _len,
+        mmap::MMapProt::from_bits_truncate(_port as i32),
+        mmap::MMapFlags::from_bits_truncate(_port as i32),
+        -1,
+        0
+    ).unwrap_or(usize::MAX) as isize
 }
 
 /// YOUR JOB: Implement munmap.

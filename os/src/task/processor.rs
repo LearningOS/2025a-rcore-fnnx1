@@ -47,6 +47,7 @@ impl Processor {
 }
 
 lazy_static! {
+    /// Global processor instance.
     pub static ref PROCESSOR: UPSafeCell<Processor> = unsafe { UPSafeCell::new(Processor::new()) };
 }
 

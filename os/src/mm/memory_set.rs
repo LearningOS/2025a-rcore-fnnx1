@@ -3,6 +3,7 @@ use super::{PTEFlags, PageTable, PageTableEntry};
 use super::{PhysAddr, PhysPageNum, VirtAddr, VirtPageNum};
 use super::{StepByOne, VPNRange};
 use crate::config::{MEMORY_END, MMIO, PAGE_SIZE, TRAMPOLINE, TRAP_CONTEXT_BASE, USER_STACK_SIZE};
+use crate::mm::mmap::{self, MMapProt};
 use crate::sync::UPSafeCell;
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
@@ -86,6 +87,65 @@ impl MemorySet {
             map_area.copy_data(&mut self.page_table, data);
         }
         self.areas.push(map_area);
+    }
+    /// 检查目标地址段是否与已有的映射冲突(存在交集)
+    fn has_conflict(&self, start: usize, len: usize) -> bool {
+        for area in self.areas.iter() {
+            let area_start = area.vpn_range.get_start().0 * PAGE_SIZE;
+            let area_end = area.vpn_range.get_end().0 * PAGE_SIZE;
+            let target_start = start;
+            let target_end = start + len;
+            if target_end > area_start && target_start < area_end {
+                return true;
+            }
+        }
+        false
+    }
+    /// 实现mmap
+    pub fn mmap(
+        &mut self,
+        addr: usize,
+        length: usize,
+        prot: mmap::MMapProt,
+        flags: mmap::MMapFlags,
+        _fd: i32,
+        _offset: usize,
+    ) -> Result<usize, i32> {
+        // 检查冲突
+        if self.has_conflict(addr, length) {
+            return Err(-1);
+        }
+
+        // 设置权限
+        let mut permission = MapPermission::empty();
+        if prot.contains(mmap::MMapProt::PROT_READ) {
+            permission |= MapPermission::R;
+        }
+        if prot.contains(mmap::MMapProt::PROT_WRITE) {
+            permission |= MapPermission::W;
+        }
+        if prot.contains(mmap::MMapProt::PROT_EXEC) {
+            permission |= MapPermission::X;
+        }
+        if prot != MMapProt::PROT_NONE {
+            permission |= MapPermission::U;
+        }
+
+        // 映射区域
+        self.insert_framed_area(
+            VirtAddr::from(addr),
+            VirtAddr::from(addr + length),
+            permission,
+        );
+
+        // 按类型处理映射内容
+        if flags.contains(mmap::MMapFlags::MAP_ANONYMOUS) {
+            // do nothing
+        } else {
+            // 待完成文件有关部分
+        }
+
+        Ok(addr)
     }
     /// Mention that trampoline is not collected by areas.
     fn map_trampoline(&mut self) {

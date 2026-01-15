@@ -118,10 +118,16 @@ fn efs_test() -> std::io::Result<()> {
         filea.clear();
         assert_eq!(filea.read_at(0, &mut buffer), 0,);
         let mut str = String::new();
-        use rand;
-        // random digit
+        // deterministic pseudo-random digits (no external RNG dependency)
+        let mut seed: u64 = 0x1234_5678_9abc_def0;
         for _ in 0..len {
-            str.push(char::from('0' as u8 + rand::random::<u8>() % 10));
+            // xorshift64*
+            seed ^= seed >> 12;
+            seed ^= seed << 25;
+            seed ^= seed >> 27;
+            seed = seed.wrapping_mul(0x2545F4914F6CDD1D);
+            let digit = (seed as u8) % 10;
+            str.push(char::from(b'0' + digit));
         }
         filea.write_at(0, str.as_bytes());
         let mut read_buffer = [0u8; 127];
