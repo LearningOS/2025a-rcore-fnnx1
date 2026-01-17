@@ -1,5 +1,6 @@
 #![deny(warnings)]
 #![allow(missing_docs)]
+
 use bitflags::*;
 use crate::task::processor::PROCESSOR;
 
@@ -16,16 +17,19 @@ bitflags! {
 // mmap 映射类型标志
 bitflags! {
     pub struct MMapFlags: i32 {
+        const MAP_FILE      = 0;
         const MAP_SHARED    = 1 << 0;
         const MAP_PRIVATE   = 1 << 1;
         const MAP_ANONYMOUS = 1 << 2;
-        const MAP_FILE      = 1 << 3;
     }
 }
 
-/// 处理mmap系统调用
-pub fn do_mmap(addr: usize, length: usize, prot: MMapProt, flags: MMapFlags, fd: i32, offset: usize) -> Result<usize, i32> {
+/// 处理mmap系统调用的分配部分
+pub fn do_mmap(addr: usize, length: usize, prot: MMapProt) -> Result<usize, i32> {
     let task = PROCESSOR.exclusive_access().current().unwrap();
     let mut task_inner = task.inner_exclusive_access();
-    task_inner.mmap(addr, length, prot, flags, fd, offset)
+    task_inner.mmap(addr, length, prot)
 }
+
+// 尽管文件映射在syscall中实现，但此处设置一个shared区域
+// unimplemented

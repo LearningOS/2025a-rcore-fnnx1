@@ -112,16 +112,13 @@ impl TaskControlBlockInner {
             self.fd_table.len() - 1
         }
     }
-    pub fn mmap(
+    pub fn mmap(//映射内存段
         &mut self,
         addr: usize,
         length: usize,
-        prot: mmap::MMapProt,
-        flags: mmap::MMapFlags,
-        fd: i32,
-        offset: usize,
+        prot: mmap::MMapProt
     ) -> Result<usize, i32> {
-        self.memory_set.mmap(addr, length, prot, flags, fd, offset)
+        self.memory_set.mmap(addr, length, prot)
     }
 }
 

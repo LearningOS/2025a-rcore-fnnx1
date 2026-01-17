@@ -7,6 +7,11 @@ DISASM_TMP := target/$(TARGET)/$(MODE)/asm
 FS_IMG := ../user/target/$(TARGET)/$(MODE)/fs.img
 APPS := ../user/src/bin/*
 OFFLINE :=
+# Extra test apps to bundle into fs.img (override from CLI if needed)
+# Examples:
+# - make run TEST_APPS=../tests/musl/basic
+# - make run TEST_APPS=../testsuits-for-oskernel/basic
+TEST_APPS ?= ../tests/musl/basic
 
 # BOARD
 BOARD := qemu
@@ -50,6 +55,14 @@ $(KERNEL_BIN): kernel
 
 fs-img: $(APPS)
 	@make -C ../user build TEST=$(TEST) CHAPTER=$(CHAPTER) BASE=$(BASE)
+	@mkdir -p ../user/build/app/
+	@if [ -n "$(TEST_APPS)" ]; then \
+	  if [ -e "$(TEST_APPS)" ]; then \
+	    cp -r "$(TEST_APPS)"/. ../user/build/app/; \
+	  else \
+	    echo "[fs-img] WARN: TEST_APPS '$(TEST_APPS)' not found; skipping"; \
+	  fi; \
+	fi
 	@rm -f $(FS_IMG)
 	@cd ../easy-fs-fuse && cargo run --release -- -s ../user/build/app/ -t ../user/target/riscv64gc-unknown-none-elf/release/
 
