@@ -383,46 +383,64 @@ impl MemorySet {
     }
     /// 实现munmap
     pub fn munmap(&mut self, start: usize, length: usize) -> Result<(),i32> {
-        let start_vpn = VirtAddr::from(start).floor();
-        let end_vpn = VirtAddr::from(start + length).ceil();
+        let end = start + length;
+        let start_vpn = VirtAddr::from(start).floor();//目标起始页号
+        let end_vpn = VirtAddr::from(end).ceil();//目标结束页号
 
         for area in self.areas.iter_mut() {
             // 找到有重合部分的区域
-            if area.vpn_range.get_start() < end_vpn && area.vpn_range.get_end() > start_vpn {// 有重合
-                let split = area.vpn_range.get_end() > end_vpn;
-                 // 如果分开了，复制一份后半部分
-                if split == true {
-                    let mut new_area = MapArea::from_another(area);
-                    new_area.vpn_range = VPNRange::new(end_vpn, area.vpn_range.get_end());
-                    // 复制数据
-                    let data = area.get_data(&mut self.page_table);
-                    // 处理前半部分
-                    if area.vpn_range.get_start() < start_vpn {
-                        // 收缩到unmap起始位置
-                        area.shrink_to(&mut self.page_table, start_vpn);
-                    } else if area.vpn_range.get_start() >= start_vpn {
-                        // 完全覆盖，直接移除
-                    self.remove_area_with_start_vpn(start_vpn)
+            if area.vpn_range.get_start() < end_vpn && area.vpn_range.get_end() > start_vpn {// 有交集;
+                let inc_left = area.vpn_range.get_start() >= start_vpn;//删左边部分
+                let inc_right = area.vpn_range.get_end() <= end_vpn;//删右边部分
+                let split = (!inc_left) & (!inc_right);//从中间分开成两个部分
+                let all = inc_left & inc_right;//删掉整个区域
+
+                let mut new_area: Option<MapArea> = None;
+
+                if all {
+                    // 使其长度为0, 稍后再删除
+                    area.shrink_to(&mut self.page_table, area.vpn_range.get_start());
+                } else if split {
+                    // 缩短自身，成为新段的左边部分
+                    let old_end = area.vpn_range.get_end();
+                    let mut mid_ft = area.data_frames.split_off(&start_vpn);
+                    area.resize(area.vpn_range.get_start(), start_vpn);
+                    // 取出右边保留部分的ft
+                    let right_ft = mid_ft.split_off(&end_vpn);
+                    // 中间部分解除映射
+                    drop(mid_ft);
+                    // 新建右边部分
+                    new_area = Some(MapArea::new(
+                        VirtAddr::from(end),
+                        VirtAddr::from(old_end),
+                        area.map_type,
+                        area.map_perm,
+                    ));
+                    new_area.as_mut().unwrap().data_frames = right_ft;
+                } else if inc_left {
+                    // 解除映射左边部分
+                    for vpn in VPNRange::new(area.vpn_range.get_start(), end_vpn) {
+                        area.unmap_one(&mut self.page_table, vpn);
                     }
-                    // 补全被多删的部分
-                    if let Some(data) = data {
-                        self.push(new_area, Some(&data));
-                    } else {
-                        self.push(new_area, None);
-                    }
-                } else {
-                    // 只删结尾部分
-                    if area.vpn_range.get_start() < start_vpn {
-                        // 收缩到unmap起始位置
-                        area.shrink_to(&mut self.page_table, start_vpn);
-                    }
-                    // 完全覆盖
-                    if area.vpn_range.get_start() >= start_vpn {
-                        self.remove_area_with_start_vpn(start_vpn)
-                    }
+                    // 调整范围
+                    area.resize(end_vpn, area.vpn_range.get_end());
+                } else if inc_right {
+                    // 删右边部分
+                    area.shrink_to(&mut self.page_table, end_vpn);
                 }
+
             }
         }
+
+        // 插入新area
+        if let Some(new_area) = new_area {
+            self.areas.push(new_area);
+        }
+
+        // 删除长度为0的area
+        self.areas.retain(|area| area.vpn_range.get_start() < area.vpn_range.get_end());
+
+        
 
         Ok(())
     }
@@ -508,6 +526,12 @@ impl MapArea {
         }
         self.vpn_range = VPNRange::new(self.vpn_range.get_start(), new_end);
     }
+    /// 只修改边界，不解除映射或新增映射
+    #[allow(unused)]
+    pub fn resize(&mut self, new_start: VirtPageNum, new_end: VirtPageNum) {
+        self.vpn_range = VPNRange::new(new_start, new_end);
+    }
+
     /// data: start-aligned but maybe with shorter length
     /// assume that all frames were cleared before
     pub fn copy_data(&mut self, page_table: &mut PageTable, data: &[u8]) {
