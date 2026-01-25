@@ -389,30 +389,36 @@ impl MemorySet {
         for area in self.areas.iter_mut() {
             // 找到有重合部分的区域
             if area.vpn_range.get_start() < end_vpn && area.vpn_range.get_end() > start_vpn {// 有重合
-                let mut new_area: MapArea;
                 let split = area.vpn_range.get_end() > end_vpn;
-                let mut data: Option<Vec<u8>> = None;
-                // 如果从中间"斩断"了，复制一份后半部分
+                 // 如果分开了，复制一份后半部分
                 if split == true {
-                    new_area = MapArea::from_another(area);
+                    let mut new_area = MapArea::from_another(area);
                     new_area.vpn_range = VPNRange::new(end_vpn, area.vpn_range.get_end());
                     // 复制数据
-                    data = area.get_data(&mut self.page_table);
-                }
-                // 处理前半部分
-                if area.vpn_range.get_start() < start_vpn {
-                    // 收缩到unmap起始位置
-                    area.shrink_to(&mut self.page_table, start_vpn);
-                } else if area.vpn_range.get_start() >= start_vpn {
-                    // 完全覆盖，直接移除
-                   self.remove_area_with_start_vpn(start_vpn)
-                }
-                // 补全被多删的部分
-                if split == true {
+                    let data = area.get_data(&mut self.page_table);
+                    // 处理前半部分
+                    if area.vpn_range.get_start() < start_vpn {
+                        // 收缩到unmap起始位置
+                        area.shrink_to(&mut self.page_table, start_vpn);
+                    } else if area.vpn_range.get_start() >= start_vpn {
+                        // 完全覆盖，直接移除
+                    self.remove_area_with_start_vpn(start_vpn)
+                    }
+                    // 补全被多删的部分
                     if let Some(data) = data {
                         self.push(new_area, Some(&data));
                     } else {
                         self.push(new_area, None);
+                    }
+                } else {
+                    // 只删结尾部分
+                    if area.vpn_range.get_start() < start_vpn {
+                        // 收缩到unmap起始位置
+                        area.shrink_to(&mut self.page_table, start_vpn);
+                    }
+                    // 完全覆盖
+                    if area.vpn_range.get_start() >= start_vpn {
+                        self.remove_area_with_start_vpn(start_vpn)
                     }
                 }
             }
