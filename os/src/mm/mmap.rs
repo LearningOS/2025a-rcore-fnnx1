@@ -24,6 +24,12 @@ bitflags! {
     }
 }
 
+pub fn do_brk(addr: usize) -> Result<usize, i32> {
+    let task = PROCESSOR.exclusive_access().current().unwrap();
+    let mut task_inner = task.inner_exclusive_access();
+    task_inner.brk(addr)
+}
+
 /// 处理mmap系统调用的分配部分
 pub fn do_mmap(addr: usize, length: usize, prot: MMapProt) -> Result<usize, i32> {
     let task = PROCESSOR.exclusive_access().current().unwrap();
@@ -33,4 +39,3 @@ pub fn do_mmap(addr: usize, length: usize, prot: MMapProt) -> Result<usize, i32>
 
 // 尽管文件映射在syscall中实现，但此处设置一个shared区域
 // unimplemented
-

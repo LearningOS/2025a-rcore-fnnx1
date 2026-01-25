@@ -66,6 +66,18 @@ impl MemorySet {
             None,
         );
     }
+    pub fn insert_file_area(
+        &mut self,
+        start_va: VirtAddr,
+        end_va: VirtAddr,
+        permission: MapPermission,
+    ) {
+        self.push(
+            MapArea::new(start_va, end_va, MapType::File, permission),
+            None,
+        );
+    }
+
     /// remove a area
     pub fn remove_area_with_start_vpn(&mut self, start_vpn: VirtPageNum) {
         if let Some((idx, area)) = self
@@ -87,56 +99,6 @@ impl MemorySet {
             map_area.copy_data(&mut self.page_table, data);
         }
         self.areas.push(map_area);
-    }
-    /// 检查目标地址段是否与已有的映射冲突(存在交集)
-    fn has_conflict(&self, start: usize, len: usize) -> bool {
-        for area in self.areas.iter() {
-            //以下均为页号
-            let area_start = area.vpn_range.get_start().0;
-            let area_end = area.vpn_range.get_end().0;
-            let target_start = start / PAGE_SIZE;
-            let target_end = (start + len) / PAGE_SIZE +1;
-            if target_end > area_start && target_start < area_end {
-                return true;
-            }
-        }
-        false
-    }
-    /// 实现mmap（只分配内存，不加载文件）
-    pub fn mmap(
-        &mut self,
-        addr: usize,
-        length: usize,
-        prot: mmap::MMapProt
-    ) -> Result<usize, i32> {
-        // 检查冲突
-        if self.has_conflict(addr, length) {
-            return Err(-1);
-        }
-
-        // 设置权限
-        let mut permission = MapPermission::empty();
-        if prot.contains(mmap::MMapProt::PROT_READ) {
-            permission |= MapPermission::R;
-        }
-        if prot.contains(mmap::MMapProt::PROT_WRITE) {
-            permission |= MapPermission::W;
-        }
-        if prot.contains(mmap::MMapProt::PROT_EXEC) {
-            permission |= MapPermission::X;
-        }
-        if prot != mmap::MMapProt::PROT_NONE {
-            permission |= MapPermission::U;
-        }
-
-        // 映射区域
-        self.insert_framed_area(
-            VirtAddr::from(addr),
-            VirtAddr::from(addr + length),
-            permission,
-        );
-
-        Ok(addr)
     }
     /// Mention that trampoline is not collected by areas.
     fn map_trampoline(&mut self) {
@@ -368,6 +330,96 @@ impl MemorySet {
             false
         }
     }
+
+    /// 检查目标地址段是否与已有的映射冲突(存在交集)
+    fn has_conflict(&self, start: usize, len: usize) -> bool {
+        for area in self.areas.iter() {
+            //以下均为页号
+            let area_start = area.vpn_range.get_start();
+            let area_end = area.vpn_range.get_end();
+            let target_start = VirtAddr::from(start).floor();
+            let target_end = VirtAddr::from(start + len).ceil();
+            if target_end > area_start && target_start < area_end {
+                return true;
+            }
+        }
+        false
+    }
+    /// 实现mmap（只分配内存，不加载文件）
+    pub fn mmap(
+        &mut self,
+        addr: usize,
+        length: usize,
+        prot: mmap::MMapProt
+    ) -> Result<usize, i32> {
+        // 检查冲突
+        if self.has_conflict(addr, length) {
+            return Err(-1);
+        }
+
+        // 设置权限
+        let mut permission = MapPermission::empty();
+        if prot.contains(mmap::MMapProt::PROT_READ) {
+            permission |= MapPermission::R;
+        }
+        if prot.contains(mmap::MMapProt::PROT_WRITE) {
+            permission |= MapPermission::W;
+        }
+        if prot.contains(mmap::MMapProt::PROT_EXEC) {
+            permission |= MapPermission::X;
+        }
+        if prot != mmap::MMapProt::PROT_NONE {
+            permission |= MapPermission::U;
+        }
+
+        // 映射区域
+        self.insert_file_area(
+            VirtAddr::from(addr),
+            VirtAddr::from(addr + length),
+            permission,
+        );
+
+        Ok(addr)
+    }
+    /// 实现munmap
+    pub fn munmap(&mut self, start: usize, length: usize) -> Result<(),i32> {
+        let start_vpn = VirtAddr::from(start).floor();
+        let end_vpn = VirtAddr::from(start + length).ceil();
+
+        for area in self.areas.iter_mut() {
+            // 找到有重合部分的区域
+            if area.vpn_range.get_start() < end_vpn && area.vpn_range.get_end() > start_vpn {// 有重合
+                let mut new_area: MapArea;
+                let split = area.vpn_range.get_end() > end_vpn;
+                let mut data: Option<Vec<u8>> = None;
+                // 如果从中间"斩断"了，复制一份后半部分
+                if split == true {
+                    new_area = MapArea::from_another(area);
+                    new_area.vpn_range = VPNRange::new(end_vpn, area.vpn_range.get_end());
+                    // 复制数据
+                    data = area.get_data(&mut self.page_table);
+                }
+                // 处理前半部分
+                if area.vpn_range.get_start() < start_vpn {
+                    // 收缩到unmap起始位置
+                    area.shrink_to(&mut self.page_table, start_vpn);
+                } else if area.vpn_range.get_start() >= start_vpn {
+                    // 完全覆盖，直接移除
+                   self.remove_area_with_start_vpn(start_vpn)
+                }
+                // 补全被多删的部分
+                if split == true {
+                    if let Some(data) = data {
+                        self.push(new_area, Some(&data));
+                    } else {
+                        self.push(new_area, None);
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
 }
 /// map area structure, controls a contiguous piece of virtual memory
 pub struct MapArea {
@@ -411,6 +463,10 @@ impl MapArea {
                 let frame = frame_alloc().unwrap();
                 ppn = frame.ppn;
                 self.data_frames.insert(vpn, frame);
+            }
+            // 对于文件映射，不应该在这里出现
+            MapType::File => {
+                panic!("should not be here!");
             }
         }
         let pte_flags = PTEFlags::from_bits(self.map_perm.bits).unwrap();
@@ -468,6 +524,21 @@ impl MapArea {
             current_vpn.step();
         }
     }
+    /// 返回这段中的数据（如果framed）
+    /// u8的vec
+    pub fn get_data(&self, page_table: &mut PageTable) -> Option<Vec<u8>> {
+        if self.map_type != MapType::Framed {
+            None
+        }
+        else {
+            let mut data = Vec::new();
+            for vpn in self.vpn_range {
+                let src = &page_table.translate(vpn).unwrap().ppn().get_bytes_array();
+                data.extend_from_slice(src);
+            }
+            Some(data)
+        }
+    }
 }
 
 #[derive(Copy, Clone, PartialEq, Debug)]
@@ -475,6 +546,7 @@ impl MapArea {
 pub enum MapType {
     Identical,
     Framed,
+    File,
 }
 
 bitflags! {

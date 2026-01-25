@@ -120,6 +120,13 @@ impl TaskControlBlockInner {
     ) -> Result<usize, i32> {
         self.memory_set.mmap(addr, length, prot)
     }
+    pub fn munmap(&mut self, addr: usize, length: usize) -> Result<(), i32> {
+        self.memory_set.munmap(addr, length)
+    }
+    /// 
+    pub fn brk() -> Result<usize, i32> {
+        
+    }
 }
 
 impl TaskControlBlock {
